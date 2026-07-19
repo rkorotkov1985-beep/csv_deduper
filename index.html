@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CSV Deduper</title>
+    
+    <<script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        html, body {
+            height: 100%;
+            font-family: 'Inter', -apple-system, system-ui, sans-serif;
+            background-color: #0b0f19;
+            color: #ffffff;
+            overflow-x: hidden;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .app-container {
+            max-width: 480px;
+            margin: 0 auto;
+            padding: 20px 16px 30px;
+            min-height: 100vh;
+        }
+        
+        /* HEADER */
+        .header {
+            text-align: center;
+            margin-bottom: 28px;
+        }
+        .header h1 {
+            font-size: 32px;
+            font-weight: 900;
+            letter-spacing: -0.5px;
+        }
+        .header .gradient {
+            background: linear-gradient(135deg, #60a5fa, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .header .subtitle {
+            color: #6b7280;
+            font-size: 13px;
+            margin-top: 4px;
+            font-weight: 500;
+        }
+        
+        /* DROP ZONE */
+        .drop-zone {
+            position: relative;
+            border: 2px dashed rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            padding: 40px 20px;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.02);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            min-height: 180px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .drop-zone:hover {
+            border-color: rgba(36, 129, 204, 0.3);
+            background: rgba(36, 129, 204, 0.03);
+        }
+        .drop-zone input[type="file"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+            z-index: 10;
+            width: 100%;
+            height: 100%;
+        }
+        .drop-zone .placeholder span {
+            font-size: 48px;
+            display: block;
+            margin-bottom: 8px;
+        }
+        .drop-zone .placeholder p {
+            color: #e5e7eb;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        .drop-zone .placeholder .hint {
+            color: #6b7280;
+            font-weight: 400;
+            font-size: 13px;
+            margin-top: 4px;
+        }
+        
+        .drop-zone .processing {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+        .drop-zone .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(36, 129, 204, 0.1);
+            border-top-color: #2481cc;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        .drop-zone .processing p {
+            color: #6b7280;
+            font-size: 14px;
+        }
+        
+        .drop-zone .file-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+        .drop-zone .file-info span {
+            font-size: 32px;
+        }
+        .drop-zone .file-name {
+            color: #60a5fa;
+            font-weight: 600;
+            word-break: break-all;
+            font-size: 14px;
+        }
+        .drop-zone .file-badge {
+            color: #4ade80;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 4px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* RESULTS */
+        .results {
+            margin-top: 20px;
+            animation: slideUp 0.4s ease;
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .metric {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 14px;
+            padding: 14px 8px;
+            text-align: center;
+        }
+        .metric .label {
+            color: #6b7280;
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 0;
+        }
+        .metric .value {
+            font-size: 24px;
+            font-weight: 800;
+            margin: 2px 0 0;
+            font-variant-numeric: tabular-nums;
+        }
+        .metric .value.blue { color: #60a5fa; }
+        .metric .value.green { color: #4ade80; }
+        .metric .value.amber { color: #fbbf24; }
+        
+        /* ACTIONS */
+        .actions {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .btn-download {
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 14px;
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            color: white;
+            font-weight: 700;
+            font-size: 15px;
+            cursor: pointer;
+            box-shadow: 0 4px 20px rgba(34, 197, 94, 0.25);
+            transition: all 0.2s;
+        }
+        .btn-download:active {
+            transform: scale(0.97);
+        }
+        
+        .btn-reset {
+            width: 100%;
+            padding: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 14px;
+            background: transparent;
+            color: #6b7280;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-reset:active {
+            transform: scale(0.97);
+        }
+        
+        /* PREMIUM */
+        .premium-lock {
+            background: rgba(245, 158, 11, 0.05);
+            border: 1px solid rgba(245, 158, 11, 0.15);
+            border-radius: 14px;
+            padding: 20px 16px;
+            text-align: center;
+        }
+        .premium-lock .lock-title {
+            color: #fbbf24;
+            font-weight: 700;
+            font-size: 14px;
+            margin: 0 0 4px;
+        }
+        .premium-lock .lock-desc {
+            color: #6b7280;
+            font-size: 12px;
+            margin: 0 0 14px;
+        }
+        .btn-premium {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-premium:active {
+            transform: scale(0.97);
+        }
+        
+        /* FOOTER */
+        .footer {
+            margin-top: 24px;
+            text-align: center;
+            padding: 12px 0 4px;
+        }
+        .footer p {
+            color: #374151;
+            font-size: 10px;
+            letter-spacing: 0.3px;
+        }
+        
+        /* RESPONSIVE */
+        @media (max-width: 380px) {
+            .header h1 { font-size: 26px; }
+            .metric .value { font-size: 20px; }
+            .drop-zone { padding: 28px 16px; min-height: 140px; }
+        }
+		
+		/* PREMIUM INFO */
+.premium-info {
+    background: linear-gradient(145deg, rgba(245,158,11,0.08), rgba(245,158,11,0.02));
+    border: 1px solid rgba(245,158,11,0.15);
+    border-radius: 20px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+.premium-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+.premium-title {
+    font-size: 17px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.premium-features {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 12px;
+    margin-bottom: 14px;
+}
+.premium-features .feature {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: #d1d5db;
+}
+.premium-price {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 12px;
+    margin-bottom: 12px;
+}
+.premium-price .price {
+    font-size: 28px;
+    font-weight: 900;
+    color: #fbbf24;
+}
+.premium-price .currency {
+    font-size: 14px;
+    font-weight: 700;
+    color: #fbbf24;
+}
+.premium-price .period {
+    font-size: 13px;
+    color: #6b7280;
+    font-weight: 500;
+}
+.btn-premium-subscribe {
+    width: 100%;
+    padding: 14px;
+    border: none;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #fff;
+    font-weight: 800;
+    font-size: 15px;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 20px rgba(245,158,11,0.25);
+}
+.btn-premium-subscribe:active { transform: scale(0.97); }
+.premium-note {
+    text-align: center;
+    font-size: 9px;
+    color: #6b7280;
+    margin-top: 8px;
+    margin-bottom: 0;
+}
+@media (max-width: 380px) {
+    .premium-features { grid-template-columns: 1fr; }
+    .premium-price .price { font-size: 24px; }
+}
+
+    </style>
+<link rel="modulepreload" href="/csv_deduper/dm-01-csv-remover-e9a18ec71d4e5dc.js" crossorigin="anonymous" integrity="sha384-Rn429Qrup8Sp9yuvit2YXMWbs+1qJgc8zFU2Yx1U/LIfttMElH0KfTYIQA6QVcZ8"><link rel="modulepreload" href="/csv_deduper/snippets/dioxus-cli-config-24e80746d3c500cd/inline0.js" crossorigin="anonymous" integrity="sha384-63GOaGGIhEHCB9m4vzzYEBfUIIUWiAYuNlk/LB2TuDDcjK13LO2II01K9xxO0fFG"><link rel="modulepreload" href="/csv_deduper/snippets/dioxus-web-bf44d47c344f35d0/inline0.js" crossorigin="anonymous" integrity="sha384-2v8X0XAeO26J0vmoLhIbIeAjVzFnrY9iLhlYJcksTMp7Ip2tbDcoX4vD/hCan7M7"><link rel="modulepreload" href="/csv_deduper/snippets/dioxus-interpreter-js-53424282ea002554/src/js/hydrate.js" crossorigin="anonymous" integrity="sha384-pfz3GoOS0du3Se5f5C1lkvbvMo0g507e24Rcu0dm29CmSCqxguUw3chk5PS1brtF"><link rel="modulepreload" href="/csv_deduper/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous" integrity="sha384-5JBHRbmtlt+1itRKLdoRs4hjdIQ0pUfmNhwtAJCq+u7x+x3KJJzzps279xv7KZFv"><link rel="modulepreload" href="/csv_deduper/snippets/dioxus-interpreter-js-53424282ea002554/src/js/common.js" crossorigin="anonymous" integrity="sha384-lNXbLTw7Z18z5HtM0HV3R7/8J+II5Ei18I53QeIZolR+l1nGEBr27UjMtT/DJpiC"><link rel="modulepreload" href="/csv_deduper/snippets/dioxus-web-bf44d47c344f35d0/src/js/eval.js" crossorigin="anonymous" integrity="sha384-2DHjVGrzcpbms06h5LAGWYB1zXEqfWTjATq1YsBBgX1CE2W+T4mRjoljwlXKhTcj"><link rel="modulepreload" href="/csv_deduper/snippets/dioxus-interpreter-js-53424282ea002554/inline0.js" crossorigin="anonymous" integrity="sha384-E7XrAE0tjDaRj+uif7xg0rIvO4VMl9KbHNgq94n8VQaTlxijO4YyNOEWxo5jD9IU"><link rel="modulepreload" href="/csv_deduper/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous" integrity="sha384-xqSmg18C2FmchYWi9fb4cSqOW4ZNNo4b7NWZK1eW+fOqg4no+2F+zETwKUf1PJy3"><link rel="preload" href="/csv_deduper/dm-01-csv-remover-e9a18ec71d4e5dc_bg.wasm" crossorigin="anonymous" integrity="sha384-3+o9p2wmVbkRUf8i4GQ3r4ppo+tEC0PtYrGDyBoQiI85TRgOGVSs/qbhMwcnehCK" as="fetch" type="application/wasm"></head>
+<body>
+    <div id="main"></div>
+    
+    <script>
+        // Telegram Init
+        if (window.Telegram && window.Telegram.WebApp) {
+            const tg = window.Telegram.WebApp;
+            tg.expand();
+            tg.enableClosingConfirmation();
+            
+            const bg = tg.themeParams.bg_color || '#0b0f19';
+            document.body.style.backgroundColor = bg;
+            
+            tg.onEvent('themeChanged', () => {
+                document.body.style.backgroundColor = tg.themeParams.bg_color || '#0b0f19';
+            });
+        }
+
+        // 🔥 УНИВЕРСАЛЬНАЯ ФУНКЦИЯ ОПЛАТЫ ДЛЯ МОБИЛОК И ПК
+        async function runTelegramInvoice(productType) {
+            const tg = window.Telegram?.WebApp;
+            if (!tg) {
+                alert('Open this app in Telegram');
+                return;
+            }
+
+            // Твой актуальный рабочий воркер Cloudflare
+            const workerUrl = "https://steep-cell-fd9c.rkorotkov1985.workers.dev/";
+
+            try {
+                tg.HapticFeedback?.notificationOccurred('success');
+
+                // 1. Стучимся на воркер и просим сгенерировать правильный slug
+                const resp = await fetch(workerUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ product: productType })
+                });
+
+                const data = await resp.json();
+                if (!data.link) throw new Error(data.error || 'Failed to get invoice link');
+
+                 // 2. 🔥 УНИВЕРСАЛЬНЫЙ ВЫЗОВ: ДЕСКТОП + МОБИЛКИ
+                
+                // Проверяем, на каком устройстве запущен бот
+                const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+                if (isMobile) {
+                    // НА МОБИЛКАХ: openLink гарантированно откроет шторку Stars без вылета в браузер
+                    console.log('📱 Mobile detected, launching via openLink...');
+                    tg.openLink(data.link);
+                } else {
+                    // НА ДЕСКТОПЕ: Используем твой рабочий openInvoice с попапом
+                    console.log('💻 Desktop detected, launching via openInvoice...');
+                    tg.openInvoice(data.link, function(status) {
+                        console.log('Invoice status:', status);
+                        if (status === 'paid') {
+                            tg.showPopup({
+                                title: '🎉 Unlocked!',
+                                message: 'Access is active. Check your chat for the license key.',
+                                buttons: [{ text: 'OK', type: 'default' }]
+                            });
+                        }
+                    });
+                }
+
+            } catch (e) {
+                console.error('❌ Invoice processing error:', e);
+                tg.showPopup({
+                    title: 'Error',
+                    message: 'Failed to start payment. Please try again.',
+                    buttons: [{ text: 'OK', type: 'default' }]
+                });
+            }
+        }
+
+        }, 1000); // Проверяем появление кнопок каждую секунду (для Dioxus/WASM это идеальный вариант)
+    </script>
+
+<script type="module">
+import init, * as bindings from '/csv_deduper/dm-01-csv-remover-e9a18ec71d4e5dc.js';
+const wasm = await init({ module_or_path: '/csv_deduper/dm-01-csv-remover-e9a18ec71d4e5dc_bg.wasm' });
+
+
+window.wasmBindings = bindings;
+
+
+dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
+
+</script></body>
+</html>
